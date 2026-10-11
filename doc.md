@@ -359,6 +359,44 @@ loopback-only automation channels.
 | 7 | Info | `AGENTS.md` suggests running `../../craftrules/scripts/contributors.py`, a script outside this repo. Not injection (opt-in credit, ask once), but don't run unaudited sibling-repo scripts. | `AGENTS.md` | None needed |
 | 8 | Info | "Show on Map" sends the photo's GPS coordinates to openstreetmap.org (in your browser, only on click). | `crates/ui-egui/src/panels/right.rs:666` | Privacy awareness only |
 
+### Follow-up: "flagged as a keylogger by anti-malware"
+
+**Probable cause: a heuristic false positive triggered by the windowing library, not by LightCraft's code.**
+
+- Scanners judge a Windows `.exe` largely by the Win32 functions it imports. LightCraft's window and keyboard
+  handling comes from **`winit` 0.30.13** (the standard Rust windowing library, also used by many other apps). Its
+  Windows backend imports exactly the set that keylogger heuristics look for: `GetAsyncKeyState`,
+  `GetKeyState`, `GetKeyboardState`, `RegisterRawInputDevices` (with the `RIDEV_INPUTSINK` "receive input while in
+  the background" flag in the binary), `GetRawInputData`, `ToUnicodeEx`, `MapVirtualKeyExW`, `GetKeyboardLayout`,
+  `SendInput`. Every winit/egui app ships these imports.
+- Other traits that raise heuristic scores: a local TCP control server that accepts commands such as `ui.key` (looks
+  like "remote control"), clipboard access (`arboard`), the UI Automation provider for screen readers
+  (`accesskit_windows`), a large new Rust binary with little reputation, and possibly no code signature (signing is
+  optional in `release.yml`).
+
+**Evidence it isn't one:**
+
+1. **No capture code in the project.** No `SetWindowsHookEx` / `WH_KEYBOARD_LL`, raw input, `RegisterHotKey`,
+   macOS `CGEventTap` or global monitors, X11 `XRecord`/`XGrabKey`, or `/dev/input` anywhere in LightCraft's source.
+   No keyboard-capture crates (`rdev`, `device_query`, `inputbot`, `global-hotkey`…) in the 665-package lockfile.
+2. **Background input is never switched on.** winit uses `RIDEV_INPUTSINK` only in `DeviceEvents::Always` mode
+   (`winit/src/platform_impl/windows/raw_input.rs:146`). The default is `WhenFocused` (`RIDEV_DEVNOTIFY` only). Neither
+   LightCraft, `eframe` 0.36.2 nor `egui-winit` 0.36.2 calls `listen_device_events`. So the app receives keys
+   **only while its own window has focus**, like any normal program.
+3. **Keystrokes go nowhere.** The 12 key-handling sites are text fields, shortcut dispatch, the shortcut editor
+   (records the combo you assign), and "a key was pressed, pause background work" checks. `control.rs` *injects*
+   keys into LightCraft's own UI for automation and doesn't read yours. The log file (`logs/lightcraft.log`) records app
+   messages only. Nothing writes key events to disk.
+4. **No way to send them out.** Phase 5: the only outbound HTTP client downloads pinned AI models on request.
+   There's no telemetry, and the Flatpak build doesn't even get network permission.
+
+**What a source review can't prove:** that a particular `.exe` was built from this source. To close that gap:
+compare its SHA-256 with `SHA256SUMS.txt` on the official `github.com/storytold/lightcraft` release; check
+the Authenticode signature (file Properties → Digital Signatures); build it yourself (`cargo build --release -p lightcraft`)
+and scan your own build; look at the VirusTotal breakdown (a few generic ML/heuristic names = typical false positive;
+many engines agreeing on a named family = treat it as real); report false positives to the vendor. A copy from any
+other site could be a repackaged trojan. This review covers only the source.
+
 ### What was checked and came back clean
 
 Hidden Unicode / Trojan Source; injection wording in every doc, config and data file; git hooks, git config and
