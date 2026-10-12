@@ -15,10 +15,10 @@ instead of only searching it.
 
 | | |
 |---|---|
-| **Current session** | **S1** (not started) |
+| **Current session** | **Parallel workflow running** (run `wf_573e1d86-7f2`, started 2026-10-12): S1, S2–S13 as 8 chunks (`audit/chunks/*.txt`), S14, S15 in parallel; S16 report after it finishes |
 | **Last completed** | none |
-| **Open questions for the user** | Sequential sessions or a parallel-agent workflow? (explained in chat 2026-10-12) |
-| **Decided** | S15 dynamic run: **yes**, in a sandbox disguised as a normal PC (2026-10-12) |
+| **Open questions for the user** | none |
+| **Decided** | S15 dynamic run: **yes**, in a sandbox disguised as a normal PC. Execution: **parallel-agent workflow** instead of manual sessions (2026-10-12). Each agent writes `audit/<chunk>.md`; findings rated Medium or worse are independently verified. If the workflow is interrupted, the manual session plan below still applies: check which `audit/*.md` notes files are complete and continue from there. |
 
 To continue in a **new Claude Code session**, paste the prompt from [Handoff prompt](#handoff-prompt) below.
 
@@ -155,3 +155,4 @@ Continue the LightCraft security audit.
 | Date | Session | Result |
 |---|---|---|
 | 2026-10-12 | plan | Plan written. |
+| 2026-10-12 | workflow | Started the parallel workflow: 8 review chunks (R1–R8, every code file assigned exactly once) + S1 sweeps/binaries + S14 deps + S15 disguised run. |
