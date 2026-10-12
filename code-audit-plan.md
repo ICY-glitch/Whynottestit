@@ -17,7 +17,8 @@ instead of only searching it.
 |---|---|
 | **Current session** | **S1** (not started) |
 | **Last completed** | none |
-| **Open questions for the user** | Run the app under `strace` in S15? (decide before S15) |
+| **Open questions for the user** | Sequential sessions or a parallel-agent workflow? (explained in chat 2026-10-12) |
+| **Decided** | S15 dynamic run: **yes**, in a sandbox disguised as a normal PC (2026-10-12) |
 
 To continue in a **new Claude Code session**, paste the prompt from [Handoff prompt](#handoff-prompt) below.
 
@@ -63,6 +64,7 @@ So:
 | I | **Persistence / privilege** | autostart, registry, LaunchAgents, cron, services, changing permissions, certificate store |
 | J | **Build-time execution** | `build.rs`, procedural macros, xtask, scripts |
 | K | **Does the code match its stated purpose?** | a function named `decode_raw` that also writes files or touches the network |
+| L | **Sandbox / VM / debugger detection** (malware hides when it thinks it's being watched) | reads of `/proc/cpuinfo` "hypervisor", `/sys/class/dmi`, `/proc/1/cgroup`, `/.dockerenv`, MAC prefixes; `cpuid` leaf `0x40000000`; strings such as `VMware`, `VBox`, `QEMU`, `KVMKVMKVM`, `Microsoft Hv`, `Xen`, `docker`, `sandbox`, `SbieDll`, `wine_get_version`; `IsDebuggerPresent`, `ptrace(PTRACE_TRACEME)`, `TracerPid`; long sleeps before acting; checks for low CPU/RAM/uptime/user files |
 
 Severity: **Critical** (malicious) · **High** (exploitable or clearly unjustified) · **Medium** · **Low** · **Info**.
 
@@ -73,7 +75,7 @@ downloads things.
 
 | Session | Scope | Approx. lines | Method | Status |
 |---|---|---|---|---|
-| **S1** | **Capability map + sweeps.** Write `audit/capability_map.py` (stdlib Python, run with `python3 -I`). For every code file it records which checklist items A–K its code touches, and assigns a risk tier. Produce `audit/files.md` (all ~540 files) and `audit/findings.md`. Run repo-wide sweeps for E, F, G, H (the pattern list above) and log every hit to check later. | all (automated) | script + review of hits | ⬜ |
+| **S1** | **Capability map + sweeps.** Write `audit/capability_map.py` (stdlib Python, run with `python3 -I`). For every code file it records which checklist items A–K its code touches, and assigns a risk tier. Produce `audit/files.md` (all ~540 files) and `audit/findings.md`. Run repo-wide sweeps for E, F, G, H, L (the pattern list above) and log every hit to check later. **L also on the official binaries:** download the v0.6.0 release builds (Windows x64/x86/arm64 exe, Linux tarball, macOS dmg), verify them against `SHA256SUMS.txt`, and search them for VM/sandbox/debugger strings and imports (`IsDebuggerPresent`, `CheckRemoteDebuggerPresent`, `NtQueryInformationProcess`). That covers Windows-only code paths that can't run here. | all (automated) | script + review of hits | ⬜ |
 | **S2** | **Tier 1: entry points and network.** `apps/lightcraft` (2.9k), `apps/lightcraft-cli` (1.5k), `apps/lightcraft-web` (3.4k), `crates/mcp` (2.3k), `crates/fetch` (1.4k), `crates/segment` (2.3k), `crates/sysmem`, all 3 `build.rs` | ~14k | every line | ⬜ |
 | **S3** | **Tier 1: tooling.** `xtask` (2.7k), `tools/*`, `packaging/*`, `.github/workflows/*`, `docs/**/*.py`, `nix/`, `flake.nix` | ~4.5k | every line | ⬜ |
 | **S4** | **engine, part 1:** command registry and dispatch, `cmd/*` (every command the UI/CLI/MCP can run) | ~18k | every line | ⬜ |
@@ -87,10 +89,47 @@ downloads things.
 | **S12** | **Pure-compute crates:** `pipeline`, `gpu` (+ `.wgsl` shaders), `codecs`, `merge`, `color`, `raster`, `geom`, `tiff`, `scenes` | ~37k | capability check + skim; read fully any file with A–J hits | ⬜ |
 | **S13** | **AI crates:** `faces` (5.3k), `denoise` (2.7k), `denoise-core` (2.2k), `heif` (2.1k): model loading, ONNX parsing, manifests | ~12k | every line | ⬜ |
 | **S14** | **Dependencies, deeper.** List every third-party crate with a `build.rs` or that is a proc-macro (they run code at build time); download and review those build scripts. Check `Cargo.lock` against the RustSec advisory database (known vulnerable, yanked or malicious crates). Re-check the `craft-libs` git dependency at its pinned commit. | n/a | download + read | ⬜ |
-| **S15** | **Optional: watch it run** (only with the user's OK). Build the Linux CLI and app, then run headless and demo modes under `strace -f` with network logging. Record every connect, file write outside expected folders, and process spawn. Compare with what the reading found. | n/a | dynamic | ⬜ |
+| **S15** | **Watch it run, in a disguised sandbox** (approved by the user 2026-10-12). See [S15 details](#s15-details-dynamic-run-in-a-disguised-sandbox). | n/a | dynamic | ⬜ |
 | **S16** | **Final report.** Cross-check: every row in `audit/files.md` is done; every S1 sweep hit is explained. Write the verdict, ranked findings and the limits of the audit into `audit/report.md`, and add a summary at the top of `doc.md`. | n/a | write-up | ⬜ |
 
 If a session's chunk turns out bigger than expected, split it (S4a, S4b…) rather than rushing.
+
+## S15 details: dynamic run in a disguised sandbox
+
+**What runs:** the **Linux** build of `lightcraft` (desktop app, on a virtual `Xvfb` screen) and `lightcraft-cli`
+(headless render, `snapshot --demo`, `mcp --demo`), built from this repo with `cargo build --release`. The Windows
+`.exe` can't run here (no Wine). Windows-only code is covered by the reading and by S1's scan of the official
+binaries.
+
+**Disguise (make it look like a normal user's PC, not a VM/container).** Done with `unshare` (private mount, hostname,
+network namespaces) and bind-mounting fake files over the real ones, for the app's processes only:
+
+| Giveaway | Spoof |
+|---|---|
+| `hypervisor` flag in `/proc/cpuinfo` | bind-mount an edited copy without `hypervisor` and with a common desktop CPU model name |
+| Missing DMI info (`/sys/class/dmi/id/*`) | tmpfs with `sys_vendor=Dell Inc.`, `product_name=XPS 15 9530`, matching board/BIOS fields |
+| Container signs (`/proc/1/cgroup`, `/proc/self/mountinfo` overlay, `container=` env, hostname) | fake `cgroup` file, normal hostname (`DESKTOP-…` / `alex-laptop`), clean environment (no `container`, CI or proxy vars) |
+| Root user, empty home | run as a normal user (`alex`, UID 1000) with a lived-in home: Pictures with JPEGs/raws, Documents, Downloads, `.config`, shell history, browser-profile folders as bait |
+| Fresh boot | fake `/proc/uptime` (several days) |
+| VM MAC prefix | network namespace with a veth using a consumer-vendor MAC (if `ip` is available; otherwise no network device at all) |
+
+**Limits (written into the report):** the CPU's own `cpuid` instruction still reports a hypervisor and can't be faked
+from inside a container. S1's static scan for `cpuid`-based checks (leaf `0x40000000`, VM vendor strings) covers
+that gap. Timing tricks and a very determined detector could still tell, so the reading stays the main evidence; the
+run confirms it.
+
+**Observation:**
+- `strace -f -tt -e trace=network,process,file,write` on everything: every socket and connect attempt, every process
+  spawned, every file opened for writing or deleted, every read outside the expected folders (bait files!).
+- Network: run inside a network namespace with **no internet route** (nothing can leave), and log every connection
+  attempt and DNS lookup from strace. A second short run with a fake DNS + HTTPS sink is optional, to see *what*
+  it would contact.
+- Scenarios: first launch; import the bait Pictures; browse and edit; export; idle for about 10 minutes with the clock moved
+  forward (`faketime`, if available, or a date-shift namespace) to tempt time-delayed triggers; quit; relaunch.
+- **Expected per the code so far:** writes only to its settings, cache and library folders and to export targets;
+  no connections unless a model download is requested; no reads of bait files it wasn't given.
+
+**Afterwards:** delete the build output (`target/`, several GB) and the sandbox folder.
 
 ## Handoff prompt
 
