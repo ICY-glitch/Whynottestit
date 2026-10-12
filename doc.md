@@ -397,6 +397,36 @@ and scan your own build; look at the VirusTotal breakdown (a few generic ML/heur
 many engines agreeing on a named family = treat it as real); report false positives to the vendor. A copy from any
 other site could be a repackaged trojan. This review covers only the source.
 
+### Follow-up: VirusTotal Sigma match "New Root or CA or AuthRoot Certificate to Store"
+
+File: SHA-256 `62394e2ecffa55d3bccd648dc854c9bb019987a0897dcb16ab410b8168ef18c9`.
+
+- **Identified as the genuine upstream build:** it is `lightcraft.exe` inside the official
+  `lightcraft-0.6.0-windows-x86-portable.zip` from `github.com/storytold/lightcraft/releases/tag/v0.6.0`.
+  I downloaded that zip myself; its SHA-256 (`070917583297…`) matches the release's published `SHA256SUMS.txt`, and the
+  exe inside hashes to exactly `62394e2e…`. It isn't a repackaged copy.
+- **The exe can't add certificates itself:** its import table (read with `objdump -p`) has no `crypt32.dll` or
+  `wintrust.dll`, no `CertAdd*` / `CertOpenSystemStore`, and no registry-write functions (`RegSetValue*`,
+  `RegCreateKey*`). The strings `crypt32`, `wintrust`, `CertAdd`, `SystemCertificates`, `AuthRoot` and `certutil`
+  don't appear anywhere in the binary, so it can't load them dynamically either. In the source (phase 5), TLS uses
+  `rustls` with a bundled root list (`webpki-roots`) and never touches the Windows store.
+- **Why the rule fires: the exe is code-signed.** It carries an Authenticode signature from **Microsoft Trusted
+  Signing** (Microsoft identity-verified code signing): signer *Learning Machines Inc, Atlanta, Georgia, US* →
+  *Microsoft ID Verified CS EOC CA 04* → *Microsoft ID Verified Code Signing PCA 2021* → root *Microsoft Identity
+  Verification Root Certificate Authority 2020* (SHA-1 `F40042E2E5F7E8EF8189FED15519AECE42C3BFA2`). That root
+  isn't preinstalled on many Windows images. When anything verifies the signature (Windows itself, SmartScreen,
+  or the sandbox), Windows' **Automatic Root Certificates Update** downloads the Microsoft root from Windows Update and
+  writes it to `HKLM\SOFTWARE\Microsoft\SystemCertificates\AuthRoot\Certificates\F40042E2…`. That registry write is
+  exactly what this Sigma rule watches. In a fresh sandbox it happens for almost any newly signed program, so this
+  rule is a well-known false-positive source.
+- **To confirm on the VirusTotal page:** under *Registry keys set*, the key should end in
+  `AuthRoot\Certificates\F40042E2E5F7E8EF8189FED15519AECE42C3BFA2` (Microsoft's root), usually written by a Windows
+  process (`svchost.exe` / CryptSvc) rather than `lightcraft.exe`. If the thumbprint were anything else, or the key
+  were under `ROOT\Certificates` written by `lightcraft.exe`, that would be a real concern. Nothing in this binary can
+  do that.
+- Minor: the repo names the publisher "Learning Machines **LLC**" (`lightcraft.wxs`, `nfpm.yaml`, metainfo). Microsoft
+  verified the signing identity as "Learning Machines **Inc**". Same name, different legal suffix. Info only.
+
 ### What was checked and came back clean
 
 Hidden Unicode / Trojan Source; injection wording in every doc, config and data file; git hooks, git config and
