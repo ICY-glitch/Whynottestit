@@ -15,8 +15,8 @@ instead of only searching it.
 
 | | |
 |---|---|
-| **Current session** | **Parallel workflow running** (run `wf_573e1d86-7f2`, started 2026-10-12): S1, S2–S13 as 8 chunks (`audit/chunks/*.txt`), S14, S15 in parallel; S16 report after it finishes |
-| **Last completed** | none |
+| **Current session** | **Done.** All sessions completed by workflow `wf_573e1d86-7f2` (2026-10-13). Verdict: **not malware**. See `audit/report.md` |
+| **Last completed** | S16, final report |
 | **Open questions for the user** | none |
 | **Decided** | S15 dynamic run: **yes**, in a sandbox disguised as a normal PC. Execution: **parallel-agent workflow** instead of manual sessions (2026-10-12). Each agent writes `audit/<chunk>.md`; findings rated Medium or worse are independently verified. If the workflow is interrupted, the manual session plan below still applies: check which `audit/*.md` notes files are complete and continue from there. |
 
@@ -75,22 +75,22 @@ downloads things.
 
 | Session | Scope | Approx. lines | Method | Status |
 |---|---|---|---|---|
-| **S1** | **Capability map + sweeps.** Write `audit/capability_map.py` (stdlib Python, run with `python3 -I`). For every code file it records which checklist items A–K its code touches, and assigns a risk tier. Produce `audit/files.md` (all ~540 files) and `audit/findings.md`. Run repo-wide sweeps for E, F, G, H, L (the pattern list above) and log every hit to check later. **L also on the official binaries:** download the v0.6.0 release builds (Windows x64/x86/arm64 exe, Linux tarball, macOS dmg), verify them against `SHA256SUMS.txt`, and search them for VM/sandbox/debugger strings and imports (`IsDebuggerPresent`, `CheckRemoteDebuggerPresent`, `NtQueryInformationProcess`). That covers Windows-only code paths that can't run here. | all (automated) | script + review of hits | ⬜ |
-| **S2** | **Tier 1: entry points and network.** `apps/lightcraft` (2.9k), `apps/lightcraft-cli` (1.5k), `apps/lightcraft-web` (3.4k), `crates/mcp` (2.3k), `crates/fetch` (1.4k), `crates/segment` (2.3k), `crates/sysmem`, all 3 `build.rs` | ~14k | every line | ⬜ |
-| **S3** | **Tier 1: tooling.** `xtask` (2.7k), `tools/*`, `packaging/*`, `.github/workflows/*`, `docs/**/*.py`, `nix/`, `flake.nix` | ~4.5k | every line | ⬜ |
-| **S4** | **engine, part 1:** command registry and dispatch, `cmd/*` (every command the UI/CLI/MCP can run) | ~18k | every line | ⬜ |
-| **S5** | **engine, part 2:** session, import, export, sidecars/XMP writing, file moves/deletes, library folders, model downloads | ~18k | every line, focus on C | ⬜ |
-| **S6** | **engine, part 3:** everything left in `crates/engine` (preset/catalog importers, Lightroom catalog reader, demo, memory, fonts…) | ~17k | every line | ⬜ |
-| **S7** | **ui-egui, part 1:** app shell, control channel (`control.rs`), headless host, menus, shortcuts, dialogs, file pickers, links | ~16k | every line | ⬜ |
-| **S8** | **ui-egui, part 2:** panels (library, develop, masking, faces, map, export…) | ~16k | every line | ⬜ |
-| **S9** | **ui-egui, part 3:** remaining ui-egui files, `locales/*.json` (strings only), icons | ~16k | every line / skim strings | ⬜ |
-| **S10** | **catalog** (11k: library database, persistence, deletion) + `preview` (1.3k: disk cache) + `meta` (4.3k: EXIF/XMP/IPTC) + `develop` (2.5k) | ~19k | every line, focus on C | ⬜ |
-| **S11** | **raw** (22k: raw decoders). Tier 3: prove it's pure computation (no A–J apart from reading the given file); skim for hidden logic | ~22k | capability check + skim | ⬜ |
-| **S12** | **Pure-compute crates:** `pipeline`, `gpu` (+ `.wgsl` shaders), `codecs`, `merge`, `color`, `raster`, `geom`, `tiff`, `scenes` | ~37k | capability check + skim; read fully any file with A–J hits | ⬜ |
-| **S13** | **AI crates:** `faces` (5.3k), `denoise` (2.7k), `denoise-core` (2.2k), `heif` (2.1k): model loading, ONNX parsing, manifests | ~12k | every line | ⬜ |
-| **S14** | **Dependencies, deeper.** List every third-party crate with a `build.rs` or that is a proc-macro (they run code at build time); download and review those build scripts. Check `Cargo.lock` against the RustSec advisory database (known vulnerable, yanked or malicious crates). Re-check the `craft-libs` git dependency at its pinned commit. | n/a | download + read | ⬜ |
-| **S15** | **Watch it run, in a disguised sandbox** (approved by the user 2026-10-12). See [S15 details](#s15-details-dynamic-run-in-a-disguised-sandbox). | n/a | dynamic | ⬜ |
-| **S16** | **Final report.** Cross-check: every row in `audit/files.md` is done; every S1 sweep hit is explained. Write the verdict, ranked findings and the limits of the audit into `audit/report.md`, and add a summary at the top of `doc.md`. | n/a | write-up | ⬜ |
+| **S1** | **Capability map + sweeps.** Write `audit/capability_map.py` (stdlib Python, run with `python3 -I`). For every code file it records which checklist items A–K its code touches, and assigns a risk tier. Produce `audit/files.md` (all ~540 files) and `audit/findings.md`. Run repo-wide sweeps for E, F, G, H, L (the pattern list above) and log every hit to check later. **L also on the official binaries:** download the v0.6.0 release builds (Windows x64/x86/arm64 exe, Linux tarball, macOS dmg), verify them against `SHA256SUMS.txt`, and search them for VM/sandbox/debugger strings and imports (`IsDebuggerPresent`, `CheckRemoteDebuggerPresent`, `NtQueryInformationProcess`). That covers Windows-only code paths that can't run here. | all (automated) | script + review of hits | ✅ |
+| **S2** | **Tier 1: entry points and network.** `apps/lightcraft` (2.9k), `apps/lightcraft-cli` (1.5k), `apps/lightcraft-web` (3.4k), `crates/mcp` (2.3k), `crates/fetch` (1.4k), `crates/segment` (2.3k), `crates/sysmem`, all 3 `build.rs` | ~14k | every line | ✅ |
+| **S3** | **Tier 1: tooling.** `xtask` (2.7k), `tools/*`, `packaging/*`, `.github/workflows/*`, `docs/**/*.py`, `nix/`, `flake.nix` | ~4.5k | every line | ✅ |
+| **S4** | **engine, part 1:** command registry and dispatch, `cmd/*` (every command the UI/CLI/MCP can run) | ~18k | every line | ✅ |
+| **S5** | **engine, part 2:** session, import, export, sidecars/XMP writing, file moves/deletes, library folders, model downloads | ~18k | every line, focus on C | ✅ |
+| **S6** | **engine, part 3:** everything left in `crates/engine` (preset/catalog importers, Lightroom catalog reader, demo, memory, fonts…) | ~17k | every line | ✅ |
+| **S7** | **ui-egui, part 1:** app shell, control channel (`control.rs`), headless host, menus, shortcuts, dialogs, file pickers, links | ~16k | every line | ✅ |
+| **S8** | **ui-egui, part 2:** panels (library, develop, masking, faces, map, export…) | ~16k | every line | ✅ |
+| **S9** | **ui-egui, part 3:** remaining ui-egui files, `locales/*.json` (strings only), icons | ~16k | every line / skim strings | ✅ |
+| **S10** | **catalog** (11k: library database, persistence, deletion) + `preview` (1.3k: disk cache) + `meta` (4.3k: EXIF/XMP/IPTC) + `develop` (2.5k) | ~19k | every line, focus on C | ✅ |
+| **S11** | **raw** (22k: raw decoders). Tier 3: prove it's pure computation (no A–J apart from reading the given file); skim for hidden logic | ~22k | capability check + skim | ✅ |
+| **S12** | **Pure-compute crates:** `pipeline`, `gpu` (+ `.wgsl` shaders), `codecs`, `merge`, `color`, `raster`, `geom`, `tiff`, `scenes` | ~37k | capability check + skim; read fully any file with A–J hits | ✅ |
+| **S13** | **AI crates:** `faces` (5.3k), `denoise` (2.7k), `denoise-core` (2.2k), `heif` (2.1k): model loading, ONNX parsing, manifests | ~12k | every line | ✅ |
+| **S14** | **Dependencies, deeper.** List every third-party crate with a `build.rs` or that is a proc-macro (they run code at build time); download and review those build scripts. Check `Cargo.lock` against the RustSec advisory database (known vulnerable, yanked or malicious crates). Re-check the `craft-libs` git dependency at its pinned commit. | n/a | download + read | ✅ |
+| **S15** | **Watch it run, in a disguised sandbox** (approved by the user 2026-10-12). See [S15 details](#s15-details-dynamic-run-in-a-disguised-sandbox). | n/a | dynamic | ✅ |
+| **S16** | **Final report.** Cross-check: every row in `audit/files.md` is done; every S1 sweep hit is explained. Write the verdict, ranked findings and the limits of the audit into `audit/report.md`, and add a summary at the top of `doc.md`. | n/a | write-up | ✅ |
 
 If a session's chunk turns out bigger than expected, split it (S4a, S4b…) rather than rushing.
 
@@ -156,3 +156,4 @@ Continue the LightCraft security audit.
 |---|---|---|
 | 2026-10-12 | plan | Plan written. |
 | 2026-10-12 | workflow | Started the parallel workflow: 8 review chunks (R1–R8, every code file assigned exactly once) + S1 sweeps/binaries + S14 deps + S15 disguised run. |
+| 2026-10-13 | workflow | Resumed after a usage-limit interruption; all 14 agents done. 587/587 files reviewed, all chunks clean; 0 Critical/High/Medium after verification. Report: `audit/report.md`. |

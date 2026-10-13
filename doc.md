@@ -1,5 +1,7 @@
 # Security audit: malware, prompt injection and network endpoints
 
+> **Update 2026-10-13: full code audit completed.** All 587 code files were read, the app was run in a disguised sandbox, and the official binaries were checked. Verdict: **not malware**. See [`audit/report.md`](audit/report.md).
+
 **Repo:** `icy-glitch/whynottestit` (branch `claude/repo-security-audit-5k5448`)
 **Started:** 2026-10-11
 **Scope:** all 733 tracked files (about 29 MB), plus git history and git config.
